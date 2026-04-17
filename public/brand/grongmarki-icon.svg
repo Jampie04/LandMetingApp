@@ -1,0 +1,30 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GrongMarki logo mark">
+  <title>GrongMarki</title>
+
+  <defs>
+    <clipPath id="pin-face">
+      <circle cx="50" cy="40" r="24"/>
+    </clipPath>
+  </defs>
+
+  <!-- Location pin outer shape -->
+  <path
+    d="M50 7C31.8 7 16 21.8 16 40C16 64 50 93 50 93C50 93 84 64 84 40C84 21.8 68.2 7 50 7Z"
+    fill="#1F6A43"
+  />
+
+  <!-- Pin face — inner circle -->
+  <circle cx="50" cy="40" r="24" fill="#174F33"/>
+
+  <!-- Land parcel grid (clipped to pin face) -->
+  <g clip-path="url(#pin-face)" stroke="#D9A21B" stroke-width="1.5" stroke-linecap="round">
+    <!-- Horizontal boundary line -->
+    <line x1="26" y1="40" x2="74" y2="40"/>
+    <!-- Vertical boundary lines -->
+    <line x1="42" y1="16" x2="42" y2="64"/>
+    <line x1="58" y1="16" x2="58" y2="64"/>
+  </g>
+
+  <!-- Survey mark — center point -->
+  <circle cx="50" cy="40" r="3" fill="#D9A21B"/>
+</svg>

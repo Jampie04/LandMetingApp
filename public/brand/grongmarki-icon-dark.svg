@@ -1,0 +1,40 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GrongMarki logo mark">
+  <title>GrongMarki</title>
+
+  <!-- Square background (for app icon / favicon use) -->
+  <rect width="100" height="100" rx="22" fill="#1F6A43"/>
+
+  <defs>
+    <clipPath id="app-pin-face">
+      <circle cx="50" cy="42" r="22"/>
+    </clipPath>
+  </defs>
+
+  <!-- Location pin outer shape (white) -->
+  <path
+    d="M50 10C33.4 10 19 23.2 19 42C19 64 50 90 50 90C50 90 81 64 81 42C81 23.2 66.6 10 50 10Z"
+    fill="white"
+    opacity="0.12"
+  />
+
+  <!-- Pin face — inner circle in dark green -->
+  <circle cx="50" cy="42" r="22" fill="#174F33"/>
+
+  <!-- Outer pin rim (white stroke) -->
+  <path
+    d="M50 10C33.4 10 19 23.2 19 42C19 64 50 90 50 90C50 90 81 64 81 42C81 23.2 66.6 10 50 10Z"
+    stroke="white"
+    stroke-width="2.5"
+    opacity="0.9"
+  />
+
+  <!-- Land parcel grid (clipped, gold) -->
+  <g clip-path="url(#app-pin-face)" stroke="#D9A21B" stroke-width="1.5" stroke-linecap="round">
+    <line x1="28" y1="42" x2="72" y2="42"/>
+    <line x1="40" y1="20" x2="40" y2="64"/>
+    <line x1="60" y1="20" x2="60" y2="64"/>
+  </g>
+
+  <!-- Survey mark -->
+  <circle cx="50" cy="42" r="3" fill="#D9A21B"/>
+</svg>

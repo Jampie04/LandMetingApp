@@ -106,6 +106,8 @@ export default function LocationPicker({ value, onChange }: LocationPickerProps)
         placeholder: "Zoek adres…",
         errorMessage: "Adres niet gevonden",
         collapsed: false,
+        // @ts-expect-error - countrycodes is valid for Nominatim but not in types
+        countrycodes: "SR",
       });
 
       geocoder.on("markgeocode", (e: { geocode: { center: import("leaflet").LatLng } }) => {

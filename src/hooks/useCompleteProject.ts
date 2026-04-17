@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/client";
 
 interface CompleteProjectArgs {
   projectId: string;
-  landmeterId: string;
 }
 
 export function useCompleteProject() {
@@ -11,7 +10,10 @@ export function useCompleteProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ projectId, landmeterId }: CompleteProjectArgs) => {
+    mutationFn: async ({ projectId }: CompleteProjectArgs) => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Niet ingelogd");
+
       const completedAt = new Date().toISOString();
 
       const { error } = await supabase
@@ -29,7 +31,7 @@ export function useCompleteProject() {
         .from("project_status_history")
         .insert({
           project_id: projectId,
-          changed_by: landmeterId,
+          changed_by: user.id,
           from_status: "in_progress",
           to_status: "completed",
         });

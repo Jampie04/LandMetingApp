@@ -1,23 +1,23 @@
 {
-  "name": "LandMeting App",
-  "short_name": "LandMeting",
-  "description": "Beheer landmeting aanvragen in Suriname",
+  "name": "GrongMarki",
+  "short_name": "GrongMarki",
+  "description": "Grond helder in beeld. Beheer landmeting aanvragen in Suriname.",
   "start_url": "/dashboard/home",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#1e40af",
+  "background_color": "#174F33",
+  "theme_color": "#1F6A43",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/brand/grongmarki-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/brand/grongmarki-icon-dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

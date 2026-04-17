@@ -48,11 +48,9 @@ export function Sidebar({ profile }: SidebarProps) {
     <aside className="hidden md:flex flex-col w-64 bg-sidebar text-sidebar-foreground min-h-screen border-r border-sidebar-border/80 shadow-[8px_0_24px_rgba(23,79,51,0.14)]">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-sidebar-border/80">
-        <div className="flex items-center justify-center w-9 h-9 bg-sidebar-accent rounded-xl shadow-[0_4px_14px_rgba(0,0,0,0.22)]">
-          <MapPin className="w-4 h-4 text-white" />
-        </div>
+        <img src="/brand/grongmarki-icon.svg" alt="GrongMarki" className="h-9 w-9" />
         <span className="font-heading font-semibold text-sm tracking-wide">
-          LandMeting
+          GrongMarki
         </span>
       </div>
 

@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/client";
 
 interface ClaimProjectArgs {
   projectId: string;
-  landmeterId: string;
 }
 
 export function useClaimProject() {
@@ -11,12 +10,15 @@ export function useClaimProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ projectId, landmeterId }: ClaimProjectArgs) => {
+    mutationFn: async ({ projectId }: ClaimProjectArgs) => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error("Niet ingelogd");
+
       const { error } = await supabase
         .from("projects")
         .update({
           status: "in_progress",
-          assigned_landmeter_id: landmeterId,
+          assigned_landmeter_id: user.id,
         })
         .eq("id", projectId);
 
@@ -27,7 +29,7 @@ export function useClaimProject() {
         .from("project_status_history")
         .insert({
           project_id: projectId,
-          changed_by: landmeterId,
+          changed_by: user.id,
           from_status: "new",
           to_status: "in_progress",
         });

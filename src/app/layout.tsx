@@ -16,13 +16,17 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "LandMeting App",
-  description: "Beheer landmeting aanvragen in Suriname",
+  title: "GrongMarki",
+  description: "Grond helder in beeld. Beheer landmeting aanvragen in Suriname.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/brand/grongmarki-icon.svg",
+    apple: "/brand/grongmarki-icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "LandMeting",
+    title: "GrongMarki",
   },
 };
 
@@ -42,33 +46,8 @@ export default function RootLayout({
       <body className={`${inter.variable} ${manrope.variable} font-sans`}>
         <Providers>{children}</Providers>
         <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ("serviceWorker" in navigator) {
-                window.addEventListener("load", function() {
-                  const isProd = ${JSON.stringify(process.env.NODE_ENV === "production")};
-
-                  if (isProd) {
-                    navigator.serviceWorker.register("/sw.js");
-                  } else {
-                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                      registrations.forEach(function(registration) {
-                        registration.unregister();
-                      });
-                    });
-
-                    if ("caches" in window) {
-                      caches.keys().then(function(keys) {
-                        keys.forEach(function(key) {
-                          caches.delete(key);
-                        });
-                      });
-                    }
-                  }
-                });
-              }
-            `,
-          }}
+          src="/sw-init.js"
+          data-is-prod={process.env.NODE_ENV === "production"}
         />
       </body>
     </html>

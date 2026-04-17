@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, FolderOpen, SlidersHorizontal } from "lucide-react";
+import { Search, FolderOpen, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -21,6 +21,8 @@ import type { ProjectStatus, ProjectWithProfile } from "@/lib/types";
 type StatusFilter = ProjectStatus | "all";
 type SortOrder = "desc" | "asc";
 
+const PAGE_SIZE = 5;
+
 export default function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
@@ -28,6 +30,11 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  function handleStatusFilter(v: StatusFilter) { setStatusFilter(v); setPage(1); }
+  function handleSortOrder(v: SortOrder) { setSortOrder(v); setPage(1); }
+  function handleSearch(v: string) { setSearch(v); setPage(1); }
 
   const { data: profile } = useProfile();
   const { data: projects, isLoading } = useProjects({
@@ -35,6 +42,14 @@ export default function ProjectsPage() {
     sortOrder,
     search,
   });
+
+  const totalCount = projects?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedProjects = (projects ?? []).slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
 
   function handleViewDetails(project: ProjectWithProfile) {
     setSelectedProjectId(project.id);
@@ -59,7 +74,7 @@ export default function ProjectsPage() {
             <Input
               placeholder="Zoek projecten…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="pl-9"
             />
           </div>
@@ -67,7 +82,7 @@ export default function ProjectsPage() {
           {/* Status filter */}
           <Select
             value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+            onValueChange={(v) => handleStatusFilter(v as StatusFilter)}
           >
             <SelectTrigger className="w-full sm:w-44">
               <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 opacity-60" />
@@ -84,7 +99,7 @@ export default function ProjectsPage() {
           {/* Sort order */}
           <Select
             value={sortOrder}
-            onValueChange={(v) => setSortOrder(v as SortOrder)}
+            onValueChange={(v) => handleSortOrder(v as SortOrder)}
           >
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="Sorteer op" />
@@ -99,17 +114,18 @@ export default function ProjectsPage() {
         {/* Results count */}
         {!isLoading && projects && (
           <p className="text-xs text-muted-foreground">
-            {projects.length}{" "}
-            {projects.length === 1 ? "project" : "projecten"} gevonden
+            {totalCount === 0
+              ? "Geen projecten gevonden"
+              : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, totalCount)} van ${totalCount} ${totalCount === 1 ? "project" : "projecten"}`}
           </p>
         )}
 
         {/* Project list */}
         {isLoading ? (
           <SkeletonList count={4} />
-        ) : projects && projects.length > 0 ? (
+        ) : paginatedProjects.length > 0 ? (
           <div className="space-y-3">
-            {projects.map((project) => (
+            {paginatedProjects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
@@ -127,6 +143,45 @@ export default function ProjectsPage() {
                 : "Er zijn nog geen projecten aangemaakt."
             }
           />
+        )}
+
+        {/* Pagination */}
+        {!isLoading && totalCount > 0 && (
+          <div className="flex items-center justify-between rounded-[16px] border bg-card px-4 py-3 shadow-[0_2px_10px_rgba(31,29,26,0.06)]">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Vorige
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`h-8 w-8 rounded-lg text-sm font-medium transition-colors ${
+                    p === safePage
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            >
+              Volgende
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 

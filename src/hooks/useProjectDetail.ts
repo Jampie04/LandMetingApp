@@ -35,14 +35,7 @@ export function useProjectDetail(projectId: string | null) {
             .from(storageBucket)
             .createSignedUrl(doc.file_path, 60 * 60 * 24);
 
-          if (signedData?.signedUrl) {
-            downloadUrl = signedData.signedUrl;
-          } else {
-            const { data: publicData } = supabase.storage
-              .from(storageBucket)
-              .getPublicUrl(doc.file_path);
-            downloadUrl = publicData?.publicUrl ?? null;
-          }
+          downloadUrl = signedData?.signedUrl ?? null;
 
           return {
             ...doc,

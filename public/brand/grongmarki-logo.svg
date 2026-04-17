@@ -1,0 +1,51 @@
+<svg viewBox="0 0 310 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GrongMarki — Grond helder in beeld.">
+  <title>GrongMarki</title>
+
+  <defs>
+    <clipPath id="logo-pin-face">
+      <circle cx="50" cy="44" r="24"/>
+    </clipPath>
+  </defs>
+
+  <!-- Location pin outer shape -->
+  <path
+    d="M50 11C31.8 11 16 25.8 16 44C16 68 50 97 50 97C50 97 84 68 84 44C84 25.8 68.2 11 50 11Z"
+    fill="#1F6A43"
+  />
+
+  <!-- Pin face — inner circle -->
+  <circle cx="50" cy="44" r="24" fill="#174F33"/>
+
+  <!-- Land parcel grid (clipped to pin face) -->
+  <g clip-path="url(#logo-pin-face)" stroke="#D9A21B" stroke-width="1.5" stroke-linecap="round">
+    <line x1="26" y1="44" x2="74" y2="44"/>
+    <line x1="42" y1="20" x2="42" y2="68"/>
+    <line x1="58" y1="20" x2="58" y2="68"/>
+  </g>
+
+  <!-- Survey mark — center point -->
+  <circle cx="50" cy="44" r="3" fill="#D9A21B"/>
+
+  <!-- Gold divider between mark and wordmark -->
+  <rect x="95" y="22" width="1.5" height="56" rx="0.75" fill="#D9A21B" opacity="0.35"/>
+
+  <!-- Wordmark: "Grong" dark + "Marki" brand green -->
+  <text
+    x="111" y="52"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    font-weight="700"
+    font-size="29"
+    fill="#1A1917"
+    letter-spacing="-0.5"
+  >Grong<tspan fill="#1F6A43">Marki</tspan></text>
+
+  <!-- Tagline -->
+  <text
+    x="112" y="70"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    font-weight="400"
+    font-size="11"
+    fill="#8A837C"
+    letter-spacing="0.6"
+  >Grond helder in beeld.</text>
+</svg>

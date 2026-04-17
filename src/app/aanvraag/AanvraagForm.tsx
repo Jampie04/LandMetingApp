@@ -10,8 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { formatFileSize } from "@/lib/utils";
+import { sanitizeString, sanitizePhoneNumber, sanitizeAddress } from "@/lib/sanitize";
 import type { PickedLocation } from "@/components/shared/LocationPicker";
 
 const LocationPicker = dynamic(
@@ -30,7 +30,7 @@ const schema = z.object({
   customer_phone: z
     .string()
     .min(7, "Vul een geldig telefoonnummer in")
-    .regex(/^[+\d\s\-()]+$/, "Ongeldig telefoonnummer"),
+    .regex(/^\+?597\d{7}$|^\d{7,8}$/, "Ongeldig Surinaams telefoonnummer (bijv. +597 700 0000)"),
   location_address: z.string().min(5, "Adres is verplicht"),
   neighborhood: z.string().optional(),
   district: z.string().optional(),
@@ -54,6 +54,27 @@ const ALLOWED_TYPES = [
   "application/pdf",
 ];
 
+// File signatures (magic numbers) for content verification
+const FILE_SIGNATURES: Record<string, string> = {
+  "application/pdf": "25504446",
+  "image/jpeg": "ffd8",
+  "image/png": "89504e47",
+  "image/webp": "52494646",
+};
+
+async function getFileSignature(file: File): Promise<string> {
+  const arrayBuffer = await file.slice(0, 4).arrayBuffer();
+  const arr = new Uint8Array(arrayBuffer);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function validateFileSignature(file: File, expectedType: string): Promise<boolean> {
+  const expectedSig = FILE_SIGNATURES[expectedType];
+  if (!expectedSig) return true; // Skip if no signature defined
+  const actualSig = await getFileSignature(file);
+  return actualSig.startsWith(expectedSig);
+}
+
 export default function AanvraagForm() {
   const [pickedLocation, setPickedLocation] = useState<PickedLocation | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -74,18 +95,39 @@ export default function AanvraagForm() {
     resolver: zodResolver(schema),
   });
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setFileError(null);
     const selected = Array.from(e.target.files ?? []);
 
-    const invalid = selected.filter(
+    // Basic validation
+    const invalidBasic = selected.filter(
       (f) => !ALLOWED_TYPES.includes(f.type) || f.size > MAX_FILE_SIZE
     );
-    if (invalid.length > 0) {
+    if (invalidBasic.length > 0) {
       setFileError(
         "Alleen PDF, JPEG, PNG en WEBP bestanden tot 10 MB zijn toegestaan."
       );
       return;
+    }
+
+    // Signature validation (async)
+    try {
+      const signatureInvalid = await Promise.all(
+        selected.map(async (f) => {
+          const isValid = await validateFileSignature(f, f.type);
+          return isValid ? null : f;
+        })
+      );
+      const invalidSignatures = signatureInvalid.filter((f): f is File => f !== null);
+      if (invalidSignatures.length > 0) {
+        setFileError(
+          "Sommige bestanden hebben een ongeldig formaat. De bestandsinhoud komt niet overeen met de extensie."
+        );
+        return;
+      }
+    } catch {
+      // If signature validation fails, fall back to basic validation only
+      console.warn("Signature validation failed, using basic validation");
     }
 
     setFiles((prev) => {
@@ -130,14 +172,14 @@ export default function AanvraagForm() {
       const { data: project, error: projectError } = await supabase
         .from("projects")
         .insert({
-          customer_first_name: values.customer_first_name.trim(),
-          customer_last_name: values.customer_last_name.trim(),
-          customer_phone: values.customer_phone.trim(),
-          location_address: values.location_address.trim(),
+          customer_first_name: sanitizeString(values.customer_first_name),
+          customer_last_name: sanitizeString(values.customer_last_name),
+          customer_phone: sanitizePhoneNumber(values.customer_phone),
+          location_address: sanitizeAddress(values.location_address),
           latitude: pickedLocation?.lat ?? null,
           longitude: pickedLocation?.lng ?? null,
-          neighborhood: values.neighborhood?.trim() || null,
-          district: values.district?.trim() || null,
+          neighborhood: values.neighborhood ? sanitizeString(values.neighborhood) : null,
+          district: values.district ? sanitizeString(values.district) : null,
           status: "new",
           assigned_landmeter_id: null,
         })
@@ -176,19 +218,11 @@ export default function AanvraagForm() {
             );
           }
 
-          let downloadUrl: string | null = null;
           const { data: signedData } = await supabase.storage
             .from(storageBucket)
             .createSignedUrl(filePath, 60 * 60 * 24 * 7);
 
-          if (signedData?.signedUrl) {
-            downloadUrl = signedData.signedUrl;
-          } else {
-            const { data: publicData } = supabase.storage
-              .from(storageBucket)
-              .getPublicUrl(filePath);
-            downloadUrl = publicData?.publicUrl ?? null;
-          }
+          const downloadUrl: string | null = signedData?.signedUrl ?? null;
 
           return {
             fileName: file.name,
@@ -209,28 +243,10 @@ export default function AanvraagForm() {
       setFileError(null);
       setLocationError(null);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Er is een onbekende fout opgetreden.";
-
-      if (/Bestand upload mislukt/i.test(message)) {
-        setSubmitError(
-          "Document upload mislukt. Controleer of de bucket bestaat en of `anon` uploadrechten heeft op `project-documents`."
-        );
-      } else if (/Documentregistratie mislukt/i.test(message)) {
-        setSubmitError(
-          "Document is geüpload maar metadata kon niet worden opgeslagen. Controleer RLS op `project_documents`."
-        );
-      } else if (/row-level security|42501/i.test(message)) {
-        setSubmitError(
-          "Database permissies zijn niet correct ingesteld (RLS). Controleer `anon INSERT` policy op `projects` en `project_documents`."
-        );
-      } else {
-        setSubmitError(
-          "Uw aanvraag kon niet worden ingediend. Probeer het opnieuw. (" +
-            message +
-            ")"
-        );
-      }
+      console.error("Submission error:", err);
+      setSubmitError(
+        "Uw aanvraag kon niet worden ingediend. Probeer het opnieuw of neem contact op met de beheerder."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -262,11 +278,9 @@ export default function AanvraagForm() {
     <div className="min-h-screen bg-background">
       <header className="bg-brand-dark text-sidebar-foreground px-4 py-4 border-b border-sidebar-border/80">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <div className="flex items-center justify-center w-9 h-9 bg-primary rounded-xl shadow-[0_4px_14px_rgba(0,0,0,0.22)]">
-            <MapPin className="w-4 h-4 text-white" />
-          </div>
+          <img src="/brand/grongmarki-icon.svg" alt="GrongMarki" className="h-9 w-9" />
           <div>
-            <p className="font-heading font-semibold text-sm tracking-wide">LandMeting Suriname</p>
+            <p className="font-heading font-semibold text-sm tracking-wide">GrongMarki</p>
             <p className="text-xs text-sidebar-muted">Aanvraagformulier</p>
           </div>
           <div className="ml-auto hidden sm:flex items-center gap-1.5">
@@ -353,10 +367,9 @@ export default function AanvraagForm() {
               <Label htmlFor="address">
                 Adres <span className="text-brand-red">*</span>
               </Label>
-              <Textarea
+              <Input
                 id="address"
                 placeholder="Indira Ghandiweg 77"
-                rows={2}
                 {...register("location_address")}
               />
               {errors.location_address && (

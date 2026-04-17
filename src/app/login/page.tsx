@@ -23,6 +23,9 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [lastAttempt, setLastAttempt] = useState<number>(0);
+
+  const RATE_LIMIT_MS = 2000; // 2 seconds between attempts (client-side, additional protection server-side by Supabase)
 
   const {
     register,
@@ -33,6 +36,13 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: LoginForm) {
+    const now = Date.now();
+    if (now - lastAttempt < RATE_LIMIT_MS) {
+      setServerError("Wacht even voordat u opnieuw probeert.");
+      return;
+    }
+    setLastAttempt(now);
+
     setServerError(null);
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
@@ -40,6 +50,8 @@ export default function LoginPage() {
     });
 
     if (error) {
+      // Supabase Auth provides built-in rate limiting and brute force protection
+      // Generic error message to prevent user enumeration
       setServerError("Ongeldig e-mailadres of wachtwoord.");
       return;
     }
@@ -53,14 +65,14 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo / brand */}
         <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary shadow-[0_8px_20px_rgba(31,106,67,0.25)]">
-            <MapPin className="h-7 w-7 text-primary-foreground" />
+          <div className="mb-4 inline-flex items-center justify-center">
+            <img src="/brand/grongmarki-icon.svg" alt="GrongMarki" className="h-14 w-14" />
           </div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">
-            LandMeting App
+            GrongMarki
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Landmeter dashboard — Suriname
+            Grond helder in beeld.
           </p>
           <div className="mt-3 flex items-center justify-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />

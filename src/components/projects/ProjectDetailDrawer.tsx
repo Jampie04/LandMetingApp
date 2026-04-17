@@ -96,7 +96,6 @@ export function ProjectDetailDrawer({
     try {
       await claimAndPrice.mutateAsync({
         projectId: project.id,
-        landmeterId: currentUserId,
         ...values,
       });
       toast.success("Project opgenomen en prijs ingesteld.");
@@ -111,7 +110,6 @@ export function ProjectDetailDrawer({
     try {
       await completeProject.mutateAsync({
         projectId: project.id,
-        landmeterId: currentUserId,
       });
       toast.success("Project afgerond.");
       setConfirmOpen(false);
