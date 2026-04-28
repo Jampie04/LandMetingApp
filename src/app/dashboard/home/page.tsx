@@ -85,6 +85,9 @@ export default function HomePage() {
             <h2 className="font-heading text-lg font-semibold text-foreground">
               Mijn actieve projecten
             </h2>
+            <span className="ml-auto rounded-full bg-secondary px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              Laatste 5
+            </span>
           </div>
 
           {loadingActive ? (

@@ -54,12 +54,15 @@ export default function LocationPicker({ value, onChange }: LocationPickerProps)
       // Fix default icon paths broken by webpack
       // @ts-expect-error _getIconUrl missing from types
       delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        iconRetinaUrl:
-          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        shadowUrl:
-          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      const markerIcon = L.icon({
+        iconUrl: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg width="32" height="48" viewBox="0 0 32 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 47C16 47 30 27.4 30 16C30 7.16344 23.732 1 16 1C8.26801 1 2 7.16344 2 16C2 27.4 16 47 16 47Z" fill="#1E6B47" stroke="white" stroke-width="2"/>
+            <circle cx="16" cy="16" r="5" fill="white"/>
+          </svg>
+        `)}`,
+        iconSize: [32, 48],
+        iconAnchor: [16, 46],
       });
 
       const map = L.map(currentContainer).setView(
@@ -79,7 +82,7 @@ export default function LocationPicker({ value, onChange }: LocationPickerProps)
         if (markerRef.current) {
           markerRef.current.setLatLng([lat, lng]);
         } else {
-          const m = L.marker([lat, lng], { draggable: true }).addTo(map);
+          const m = L.marker([lat, lng], { draggable: true, icon: markerIcon }).addTo(map);
           markerRef.current = m;
           m.on("dragend", () => {
             const pos = m.getLatLng();
@@ -105,7 +108,7 @@ export default function LocationPicker({ value, onChange }: LocationPickerProps)
         defaultMarkGeocode: false, // we handle the marker ourselves
         placeholder: "Zoek adres…",
         errorMessage: "Adres niet gevonden",
-        collapsed: false,
+        collapsed: true,
         // @ts-expect-error - countrycodes is valid for Nominatim but not in types
         countrycodes: "SR",
       });

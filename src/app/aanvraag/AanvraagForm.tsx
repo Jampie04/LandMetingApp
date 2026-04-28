@@ -166,29 +166,29 @@ export default function AanvraagForm() {
 
     try {
       const supabase = createClient();
+      const randomProjectId = crypto.randomUUID()
       const storageBucket =
         process.env.NEXT_PUBLIC_STORAGE_BUCKET ?? "project-documents";
 
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .insert({
-          customer_first_name: sanitizeString(values.customer_first_name),
-          customer_last_name: sanitizeString(values.customer_last_name),
-          customer_phone: sanitizePhoneNumber(values.customer_phone),
-          location_address: sanitizeAddress(values.location_address),
-          latitude: pickedLocation?.lat ?? null,
-          longitude: pickedLocation?.lng ?? null,
-          neighborhood: values.neighborhood ? sanitizeString(values.neighborhood) : null,
-          district: values.district ? sanitizeString(values.district) : null,
-          status: "new",
-          assigned_landmeter_id: null,
-        })
-        .select("id")
-        .single();
+const projectId = randomProjectId;
 
-      if (projectError) throw projectError;
+const { error: projectError } = await supabase
+  .from("projects")
+  .insert({
+    id: projectId,
+    customer_first_name: sanitizeString(values.customer_first_name),
+    customer_last_name: sanitizeString(values.customer_last_name),
+    customer_phone: sanitizePhoneNumber(values.customer_phone),
+    location_address: sanitizeAddress(values.location_address),
+    latitude: pickedLocation?.lat ?? null,
+    longitude: pickedLocation?.lng ?? null,
+    neighborhood: values.neighborhood ? sanitizeString(values.neighborhood) : null,
+    district: values.district ? sanitizeString(values.district) : null,
+    status: "new",
+    assigned_landmeter_id: null,
+  });
 
-      const projectId = project.id as string;
+if (projectError) throw projectError;
 
       const persistedDocuments = await Promise.all(
         files.map(async (file): Promise<UploadedDocument> => {

@@ -76,7 +76,7 @@ export function ClaimAndPriceDialog({
     resolver: zodResolver(schema),
     defaultValues: {
       currency: "SRD",
-      estimated_duration_unit: undefined,
+      estimated_duration_unit: "days",
     },
   });
 
