@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, FolderOpen, LogOut, MapPin } from "lucide-react";
+import { Home, FolderOpen, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -27,10 +27,8 @@ export function MobileNav() {
       {/* Top header bar (mobile only) */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-sidebar text-sidebar-foreground border-b border-sidebar-border/80">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 bg-sidebar-accent rounded-lg shadow-[0_3px_10px_rgba(0,0,0,0.25)]">
-            <MapPin className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="font-heading font-semibold text-sm tracking-wide">LandMeting</span>
+          <img src="/brand/grongmarki-icon.svg" alt="GrongMarki" className="h-8 w-8" />
+          <span className="font-heading font-semibold text-sm tracking-wide">GrongMarki</span>
         </div>
         <button
           onClick={handleLogout}
