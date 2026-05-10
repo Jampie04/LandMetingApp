@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeString } from "@/lib/sanitize";
 
 export interface ClaimAndPriceArgs {
   projectId: string;
@@ -28,7 +29,10 @@ export function useClaimAndPrice() {
 
       const now = new Date().toISOString();
 
-      const { error } = await supabase
+      // Conditional transition: only succeed if still 'new'. .select() lets us
+      // detect races and skip the history insert when a retry hits a row we
+      // already transitioned ourselves.
+      const { data: updated, error } = await supabase
         .from("projects")
         .update({
           status: "in_progress",
@@ -37,13 +41,44 @@ export function useClaimAndPrice() {
           currency,
           estimated_duration_value,
           estimated_duration_unit,
-          pricing_notes: pricing_notes ?? null,
+          pricing_notes: pricing_notes ? sanitizeString(pricing_notes) : null,
           priced_at: now,
           priced_by_landmeter_id: user.id,
         })
-        .eq("id", projectId);
+        .eq("id", projectId)
+        .eq("status", "new")
+        .select("id");
 
       if (error) throw error;
+
+      if (!updated || updated.length === 0) {
+        const { data: current, error: readError } = await supabase
+          .from("projects")
+          .select("assigned_landmeter_id, status")
+          .eq("id", projectId)
+          .maybeSingle();
+        if (readError) throw readError;
+        if (!current) throw new Error("Project niet gevonden");
+        if (current.assigned_landmeter_id !== user.id) {
+          throw new Error("Dit project is al door iemand anders geclaimd.");
+        }
+        // Already ours — keep the latest pricing fields by reapplying without
+        // the status guard, but do not write another history row.
+        const { error: priceUpdateError } = await supabase
+          .from("projects")
+          .update({
+            estimated_price,
+            currency,
+            estimated_duration_value,
+            estimated_duration_unit,
+            pricing_notes: pricing_notes ? sanitizeString(pricing_notes) : null,
+            priced_at: now,
+            priced_by_landmeter_id: user.id,
+          })
+          .eq("id", projectId);
+        if (priceUpdateError) throw priceUpdateError;
+        return;
+      }
 
       const { error: historyError } = await supabase
         .from("project_status_history")

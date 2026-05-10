@@ -10,6 +10,8 @@ export function useProjectDetail(projectId: string | null) {
   return useQuery<ProjectDetail | null>({
     queryKey: ["project", projectId],
     enabled: !!projectId,
+    staleTime: 5 * 60 * 1000,
+    networkMode: "offlineFirst",
     queryFn: async () => {
       const [projectRes, docsRes] = await Promise.all([
         supabase

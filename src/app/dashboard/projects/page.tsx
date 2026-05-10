@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, FolderOpen, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { useProjects } from "@/hooks/useProjects";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -36,6 +38,7 @@ export default function ProjectsPage() {
   function handleSortOrder(v: SortOrder) { setSortOrder(v); setPage(1); }
   function handleSearch(v: string) { setSearch(v); setPage(1); }
 
+  const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const { data: projects, isLoading } = useProjects({
     statusFilter,
@@ -50,6 +53,46 @@ export default function ProjectsPage() {
     (safePage - 1) * PAGE_SIZE,
     safePage * PAGE_SIZE
   );
+
+  useEffect(() => {
+    if (!projects?.length) return;
+    const supabase = createClient();
+    const storageBucket = process.env.NEXT_PUBLIC_STORAGE_BUCKET ?? "project-documents";
+    projects.forEach((project) => {
+      queryClient.prefetchQuery({
+        queryKey: ["project", project.id],
+        staleTime: 5 * 60 * 1000,
+        retry: 0,
+        queryFn: async () => {
+          const [projectRes, docsRes] = await Promise.all([
+            supabase
+              .from("projects")
+              .select(`*, profiles:assigned_landmeter_id(full_name, phone_number), priced_by_profile:priced_by_landmeter_id(full_name)`)
+              .eq("id", project.id)
+              .single(),
+            supabase
+              .from("project_documents")
+              .select("*")
+              .eq("project_id", project.id)
+              .order("uploaded_at", { ascending: true }),
+          ]);
+          if (projectRes.error) throw projectRes.error;
+          if (docsRes.error) throw docsRes.error;
+
+          const docsWithDownloadUrl = await Promise.all(
+            (docsRes.data ?? []).map(async (doc) => {
+              const { data: signedData } = await supabase.storage
+                .from(storageBucket)
+                .createSignedUrl(doc.file_path, 60 * 60 * 24);
+              return { ...doc, download_url: signedData?.signedUrl ?? null };
+            })
+          );
+
+          return { project: projectRes.data, documents: docsWithDownloadUrl };
+        },
+      });
+    });
+  }, [projects, queryClient]);
 
   function handleViewDetails(project: ProjectWithProfile) {
     setSelectedProjectId(project.id);

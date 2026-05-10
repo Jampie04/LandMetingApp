@@ -10,7 +10,7 @@
 //   - Supabase / cross-origin    -> bypassed, browser handles
 //   - Non-GET                    -> bypassed
 
-const CACHE_VERSION = "grongmarki-v6";
+const CACHE_VERSION = "grongmarki-v7";
 const RUNTIME_CACHE = CACHE_VERSION + "-runtime";
 const PRECACHE = CACHE_VERSION + "-precache";
 
@@ -23,13 +23,30 @@ const PRECACHE_URLS = [
   "/brand/grongmarki-logo.svg",
 ];
 
+// Dashboard routes to warm into the runtime cache on install so offline
+// navigation between routes always has a shell to fall back to.
+const DASHBOARD_SHELL_URLS = ["/dashboard/home"];
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(PRECACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
+    Promise.all([
+      caches
+        .open(PRECACHE)
+        .then((cache) => cache.addAll(PRECACHE_URLS)),
+      caches
+        .open(RUNTIME_CACHE)
+        .then((cache) =>
+          Promise.allSettled(
+            DASHBOARD_SHELL_URLS.map((url) =>
+              fetch(url).then((res) => {
+                if (res.ok) cache.put(url, res);
+              })
+            )
+          )
+        ),
+    ])
       .then(() => self.skipWaiting())
-      .catch((err) => console.warn("[SW] precache failed:", err))
+      .catch((err) => console.warn("[SW] install failed:", err))
   );
 });
 
@@ -80,6 +97,16 @@ async function networkFirstNavigation(request) {
     if (url.pathname.startsWith("/dashboard")) {
       const home = await runtime.match("/dashboard/home", { ignoreSearch: true });
       if (home) return home;
+
+      // Try any cached dashboard page as a shell to allow client-side navigation.
+      const allCached = await runtime.keys();
+      for (const req of allCached) {
+        const cachedUrl = new URL(req.url);
+        if (cachedUrl.pathname.startsWith("/dashboard")) {
+          const shell = await runtime.match(req);
+          if (shell) return shell;
+        }
+      }
     }
 
     const offline = await caches.match("/offline.html");

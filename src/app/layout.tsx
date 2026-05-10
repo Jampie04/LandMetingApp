@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Manrope } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -36,18 +37,22 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? "";
+
   return (
     <html lang="nl">
       <body className={`${inter.variable} ${manrope.variable} font-sans`}>
         <Providers>{children}</Providers>
         <script
           src="/sw-init.js"
+          nonce={nonce}
           data-is-prod={process.env.NODE_ENV === "production"}
+          suppressHydrationWarning
         />
       </body>
     </html>

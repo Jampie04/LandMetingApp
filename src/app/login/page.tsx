@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { MapPin, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 
 const loginSchema = z.object({
   email: z.string().email("Voer een geldig e-mailadres in"),
-  password: z.string().min(6, "Wachtwoord moet minimaal 6 tekens zijn"),
+  password: z.string().min(8, "Wachtwoord moet minimaal 8 tekens zijn"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -154,6 +155,16 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Geen toegang? Neem contact op met de beheerder.
+        </p>
+
+        <p className="mt-3 text-center text-sm text-muted-foreground">
+          Bent u een klant?{" "}
+          <Link
+            href="/aanvraag"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Dien een aanvraag in
+          </Link>
         </p>
       </div>
     </div>

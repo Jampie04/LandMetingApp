@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -85,6 +86,20 @@ export default function AanvraagForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Stable project id per submission attempt: reused across retries so a
+  // failed submit followed by a fix + resubmit does NOT create a duplicate
+  // project row. Reset only after a fully successful submission.
+  const projectIdRef = useRef<string | null>(null);
+  // Tracks per-file progress for the current projectIdRef so retries skip
+  // work that already succeeded. Anon RLS only allows INSERT (no SELECT/UPDATE),
+  // so we cannot ask the server what is already there — we must remember it.
+  type FileProgress = {
+    filePath: string;
+    uploaded: boolean;
+    dbInserted: boolean;
+    downloadUrl: string | null;
+  };
+  const uploadedFilesRef = useRef<Map<string, FileProgress>>(new Map());
 
   const {
     register,
@@ -141,6 +156,13 @@ export default function AanvraagForm() {
 
   function removeFile(name: string) {
     setFiles((prev) => prev.filter((f) => f.name !== name));
+
+    // If this file was already persisted in a previous (failed) attempt,
+    // clean up storage + DB so we don't leave orphans behind.
+    // Note: we cannot clean up storage / project_documents here because anon
+    // RLS does not allow DELETE. Orphan rows/files from removed-after-retry
+    // files will need a server-side cleanup job.
+    uploadedFilesRef.current.delete(name);
   }
 
   function handleLocationChange(loc: PickedLocation) {
@@ -166,75 +188,118 @@ export default function AanvraagForm() {
 
     try {
       const supabase = createClient();
-      const randomProjectId = crypto.randomUUID()
       const storageBucket =
         process.env.NEXT_PUBLIC_STORAGE_BUCKET ?? "project-documents";
 
-const projectId = randomProjectId;
+      // Reuse the same projectId across retries to prevent duplicate inserts.
+      if (!projectIdRef.current) {
+        projectIdRef.current = crypto.randomUUID();
+      }
+      const projectId = projectIdRef.current;
 
-const { error: projectError } = await supabase
-  .from("projects")
-  .insert({
-    id: projectId,
-    customer_first_name: sanitizeString(values.customer_first_name),
-    customer_last_name: sanitizeString(values.customer_last_name),
-    customer_phone: sanitizePhoneNumber(values.customer_phone),
-    location_address: sanitizeAddress(values.location_address),
-    latitude: pickedLocation?.lat ?? null,
-    longitude: pickedLocation?.lng ?? null,
-    neighborhood: values.neighborhood ? sanitizeString(values.neighborhood) : null,
-    district: values.district ? sanitizeString(values.district) : null,
-    status: "new",
-    assigned_landmeter_id: null,
-  });
+      // Plain insert with stable id. Anon role has INSERT only — no UPDATE —
+      // so we cannot upsert. Instead we rely on the primary-key duplicate
+      // error (23505) to detect a row that was already created in a prior
+      // attempt and treat it as success (the data is identical anyway).
+      const { error: projectError } = await supabase
+        .from("projects")
+        .insert({
+          id: projectId,
+          customer_first_name: sanitizeString(values.customer_first_name),
+          customer_last_name: sanitizeString(values.customer_last_name),
+          customer_phone: sanitizePhoneNumber(values.customer_phone),
+          location_address: sanitizeAddress(values.location_address),
+          latitude: pickedLocation?.lat ?? null,
+          longitude: pickedLocation?.lng ?? null,
+          neighborhood: values.neighborhood ? sanitizeString(values.neighborhood) : null,
+          district: values.district ? sanitizeString(values.district) : null,
+          status: "new",
+          assigned_landmeter_id: null,
+        });
 
-if (projectError) throw projectError;
+      if (projectError && projectError.code !== "23505") throw projectError;
 
       const persistedDocuments = await Promise.all(
         files.map(async (file): Promise<UploadedDocument> => {
-          const filePath = `${projectId}/${Date.now()}_${file.name}`;
+          // Stable path per (project, file name) so retries don't create
+          // orphaned storage objects.
+          const filePath = `${projectId}/${file.name}`;
+          const progress: FileProgress = uploadedFilesRef.current.get(file.name) ?? {
+            filePath,
+            uploaded: false,
+            dbInserted: false,
+            downloadUrl: null,
+          };
+          uploadedFilesRef.current.set(file.name, progress);
 
-          const { error: uploadError } = await supabase.storage
-            .from(storageBucket)
-            .upload(filePath, file, { upsert: false });
+          // Step 1: upload to storage (skip if already done in a prior attempt).
+          if (!progress.uploaded) {
+            const { error: uploadError } = await supabase.storage
+              .from(storageBucket)
+              .upload(filePath, file, { upsert: false });
 
-          if (uploadError) {
-            throw new Error(`Bestand upload mislukt (${file.name}): ${uploadError.message}`);
+            // Storage returns "The resource already exists" / 409 when the
+            // object is already present from a prior attempt — treat as success.
+            const alreadyExists =
+              uploadError &&
+              (uploadError.message?.toLowerCase().includes("already exists") ||
+                uploadError.statusCode === "409");
+
+            if (uploadError && !alreadyExists) {
+              throw new Error(
+                `Bestand upload mislukt (${file.name}): ${uploadError.message}`
+              );
+            }
+            progress.uploaded = true;
           }
 
-          const { error: documentInsertError } = await supabase
-            .from("project_documents")
-            .insert({
-              project_id: projectId,
-              file_name: file.name,
-              file_path: filePath,
-              mime_type: file.type,
-              file_size_bytes: file.size,
-            });
+          // Step 2: insert metadata row (skip if already done).
+          // NOTE: there is no unique constraint on (project_id, file_path), so
+          // a network drop *after* the server applied the insert but before the
+          // response reached us would, on retry, create a duplicate document
+          // row. Rare; add a unique index in a future migration to harden this.
+          if (!progress.dbInserted) {
+            const { error: documentInsertError } = await supabase
+              .from("project_documents")
+              .insert({
+                project_id: projectId,
+                file_name: file.name,
+                file_path: filePath,
+                mime_type: file.type,
+                file_size_bytes: file.size,
+              });
 
-          if (documentInsertError) {
-            throw new Error(
-              `Documentregistratie mislukt (${file.name}): ${documentInsertError.message}`
-            );
+            if (documentInsertError) {
+              throw new Error(
+                `Documentregistratie mislukt (${file.name}): ${documentInsertError.message}`
+              );
+            }
+            progress.dbInserted = true;
           }
 
-          const { data: signedData } = await supabase.storage
-            .from(storageBucket)
-            .createSignedUrl(filePath, 60 * 60 * 24 * 7);
-
-          const downloadUrl: string | null = signedData?.signedUrl ?? null;
+          // Step 3: signed URL (regenerate every attempt; cheap and idempotent).
+          if (!progress.downloadUrl) {
+            const { data: signedData } = await supabase.storage
+              .from(storageBucket)
+              .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+            progress.downloadUrl = signedData?.signedUrl ?? null;
+          }
 
           return {
             fileName: file.name,
             filePath,
             fileSize: file.size,
             mimeType: file.type,
-            downloadUrl,
+            downloadUrl: progress.downloadUrl,
           };
         })
       );
 
       setUploadedDocuments(persistedDocuments);
+
+      // Full success — clear the per-attempt id so the next aanvraag gets a new one.
+      projectIdRef.current = null;
+      uploadedFilesRef.current.clear();
 
       setSubmitted(true);
       reset();
@@ -283,7 +348,13 @@ if (projectError) throw projectError;
             <p className="font-heading font-semibold text-sm tracking-wide">GrongMarki</p>
             <p className="text-xs text-sidebar-muted">Aanvraagformulier</p>
           </div>
-          <div className="ml-auto hidden sm:flex items-center gap-1.5">
+          <Link
+            href="/login"
+            className="ml-auto text-xs font-medium text-sidebar-foreground/90 underline-offset-4 hover:underline"
+          >
+            Inloggen voor landmeters
+          </Link>
+          <div className="hidden sm:flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />
             <span className="h-1.5 w-1.5 rounded-full bg-brand-gold" />
           </div>
